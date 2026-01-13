@@ -28,7 +28,7 @@
 
 # 执行
 ```
-bash <(wget -qO- -o- https://github.com/flyduckfly/233boy-sing-box/raw/main/install.sh)
+bash <(wget -qO- -o- https://github.com/flyduckfly/sing-box/raw/main/install.sh)
 ```
 
 # 文档
