@@ -714,20 +714,8 @@ uninstall() {
     # 如不想清理历史，注释下面两行即可
     history -c || true
     : > /root/.bash_history || true
-    
-    echo
-    echo "=== 清理完成，开始最终验证 ==="
-    
-    echo "- sb:"
-    type sb 2>/dev/null || echo "  sb: not found"
-    
-    echo "- sing-box:"
-    command -v sing-box 2>/dev/null || echo "  sing-box: not found"
-    
-    echo
-    echo "系统已处于干净状态 ✅"
     hash -r
-    msg "脚本哪里需要完善? 请反馈"
+    
     msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
 }
 
