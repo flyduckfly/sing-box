@@ -183,17 +183,18 @@ is_test() {
 }
 
 is_port_used() {
-#    if [[ $(type -P netstat) ]]; then
-#        [[ ! $is_used_port ]] && is_used_port="$(netstat -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
-#        echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
-#        return
- #   fi
- #   if [[ $(type -P ss) ]]; then
- #       [[ ! $is_used_port ]] && is_used_port="$(ss -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
- #       echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
- #       return
- #   fi
- #   is_cant_test_port=1
+    if [[ $(type -P netstat) ]]; then
+        [[ ! $is_used_port ]] && is_used_port="$(netstat -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
+        echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
+        return
+    fi
+    if [[ $(type -P ss) ]]; then
+        [[ ! $is_used_port ]] && is_used_port="$(ss -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
+        echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
+        return
+    fi
+    is_cant_test_port=1
+ 
     msg "$is_warn 无法检测端口是否可用."
     msg "请执行: $(_yellow "${cmd} update -y; ${cmd} install net-tools -y") 来修复此问题."
 }
