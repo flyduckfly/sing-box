@@ -193,42 +193,27 @@ download() {
 
 # get server ip
 get_ip() {
-    # 1. 定义 API 列表，包含你要求的 Cloudflare 接口和原本的 JSON 接口
-    # 优先使用 Cloudflare 接口，因为它们的响应最快且最稳定
+    # 只获取IPv4地址，尝试多个API
     local api_endpoints=(
-        "https://one.one.one.one/cdn-cgi/trace"
-        "https://cloudflare.com/cdn-cgi/trace"
         "https://api-ipv4.ip.sb/geoip"
         "https://api.ipapi.is"
     )
-
-    local response
-    local extracted_ip
-
+    
     for api in "${api_endpoints[@]}"; do
-        # 2. 增加 5 秒超时限制，防止在“更改配置”时无限期卡住
-        response=$(_wget -4 -qO- --timeout=5 --tries=1 "$api" 2>/dev/null)
-        
+        local response=$(_wget -4 -qO- "$api" 2>/dev/null)
         if [[ -n "$response" ]]; then
-            # 3. 判断响应格式：如果是 Cloudflare 的 trace 格式，提取 ip= 之后的内容
-            if echo "$response" | grep -q "ip="; then
-                extracted_ip=$(echo "$response" | grep "ip=" | cut -d= -f2)
-            # 4. 如果是普通的 JSON 格式，使用 jq 解析
-            else
-                extracted_ip=$(echo "$response" | jq -r '.ip // .query // .address // .ip_address' 2>/dev/null)
-            fi
-
-            # 5. 最终验证并导出变量
+            # 尝试解析JSON响应获取IP
+            local extracted_ip=$(echo "$response" | jq -r '.ip // .query // .address // .ip_address' 2>/dev/null)
             if [[ -n "$extracted_ip" && "$extracted_ip" != "null" ]]; then
-                # 使用 export ip=xxx 格式，确保与脚本后续逻辑兼容
                 export ip="$extracted_ip"
                 return 0
             fi
         fi
+        # 短暂延迟，避免请求过快
         sleep 0.5
     done
-
-    # 如果全部失败，清空变量防止残留旧数据
+    
+    # 如果所有API都失败，返回空
     export ip=""
     return 1
 }
