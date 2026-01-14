@@ -692,30 +692,37 @@ uninstall() {
     _green "\n卸载完成!"
     
     set -e
-    echo "==> [1/5] 清理当前 shell 中的 sb alias（如存在）"
+    # 1. 增加对全局配置文件的清理，防止别名在其他地方复活
+    echo "==> [1/5] 清理当前 shell 内存及全局配置中的 sb alias"
     unalias sb 2>/dev/null || true
+    unalias sing-box 2>/dev/null || true
     
-    echo "==> [2/5] 从 /root/.bashrc 中删除 sb alias"
-    if grep -qE '^alias sb=' /root/.bashrc 2>/dev/null; then
-        sed -i.bak '/^alias sb=/d' /root/.bashrc
-        echo "    已删除 alias sb（原文件已备份为 /root/.bashrc.bak）"
-    else
-        echo "    未发现 alias sb"
-    fi
+    # 2. 增强 sed 匹配模式，防止因空格或引号导致删除失败
+    echo "==> [2/5] 从配置文件中彻底删除别名定义"
+    FILES_TO_CLEAN=("/root/.bashrc" "/etc/bash.bashrc" "/etc/profile")
+    for file in "${FILES_TO_CLEAN[@]}"; do
+        if [ -f "$file" ]; then
+            # 匹配 alias sb= 或 alias sing-box= 开头的行
+            sed -i.bak -E '/alias (sb|sing-box)=/d' "$file"
+        fi
+    done
+
+    echo "==> [3/5] 刷新系统命令哈希表"
+    # hash -r 必须在删除文件后立即执行，确保 PATH 重新扫描
+    hash -r
     
-    echo "==> [3/5] 重新加载 bash 配置"
-    source /root/.bashrc || true
+    echo "==> [4/5] 物理删除二进制文件及所有可能的软链接"
+    # 增加对 /usr/bin/sb 的覆盖
+    rm -f /usr/local/bin/sing-box /usr/bin/sing-box
+    rm -f /usr/local/bin/sb /usr/bin/sb
     
-    echo "==> [4/5] 删除可能残留的 sing-box 文件/软链接"
-    rm -f /usr/local/bin/sing-box
-    rm -f /usr/bin/sing-box
-    rm -f /usr/local/bin/sb
-    
-    echo "==> [5/5] 可选：清理历史记录中的 sing-box 痕迹"
-    # 如不想清理历史，注释下面两行即可
+    echo "==> [5/5] 清理历史记录并提示生效"
     history -c || true
+    # 清空历史文件
     : > /root/.bash_history || true
     hash -r
+    echo -e "\n${green}清理完成！${none}"
+    echo -e "${yellow}注意：${none}如果输入 'sb' 仍报错，请手动执行命令: ${cyan}unalias sb && hash -r${none}"
     
     msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
 }
