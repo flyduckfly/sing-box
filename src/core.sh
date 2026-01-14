@@ -193,7 +193,7 @@ is_port_used() {
  #       echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
  #       return
  #   fi
-    is_cant_test_port=1
+ #   is_cant_test_port=1
     msg "$is_warn 无法检测端口是否可用."
     msg "请执行: $(_yellow "${cmd} update -y; ${cmd} install net-tools -y") 来修复此问题."
 }
