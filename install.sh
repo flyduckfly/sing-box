@@ -200,7 +200,6 @@ get_ip() {
             "https://ifconfig.co/json"                # JSON
             "https://ipapi.co/json"                   # JSON
             "https://1.1.1.1/cdn-cgi/trace"           # Text (Cloudflare)
-            "https://domains.google.com/checkip"      # Text (Google)
             "https://api.ipify.org"                   # Text
         )
         
