@@ -193,29 +193,14 @@ download() {
 
 # get server ip
 get_ip() {
-    # 只获取IPv4地址，尝试多个API
-    local api_endpoints=(
-        "https://api-ipv4.ip.sb/geoip"
-        "https://api.ipapi.is"
-    )
+    # 强制只获取 IPv4 地址，增加 5 秒超时限制，增加备用接口
+    # 尝试第一个接口 (one.one.one.one)
+    export "$(_wget -4 -qO- --timeout=5 --tries=1 https://one.one.one.one/cdn-cgi/trace 2>/dev/null | grep ip=)"
     
-    for api in "${api_endpoints[@]}"; do
-        local response=$(_wget -4 -qO- "$api" 2>/dev/null)
-        if [[ -n "$response" ]]; then
-            # 尝试解析JSON响应获取IP
-            local extracted_ip=$(echo "$response" | jq -r '.ip // .query // .address // .ip_address' 2>/dev/null)
-            if [[ -n "$extracted_ip" && "$extracted_ip" != "null" ]]; then
-                export ip="$extracted_ip"
-                return 0
-            fi
-        fi
-        # 短暂延迟，避免请求过快
-        sleep 0.5
-    done
-    
-    # 如果所有API都失败，返回空
-    export ip=""
-    return 1
+    # 如果第一个接口失败，尝试第二个接口 (cloudflare.com)
+    if [[ -z $ip ]]; then
+        export "$(_wget -4 -qO- --timeout=5 --tries=1 https://cloudflare.com/cdn-cgi/trace 2>/dev/null | grep ip=)"
+    fi
 }
 
 # check background tasks status
