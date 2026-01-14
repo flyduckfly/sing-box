@@ -120,10 +120,13 @@ get_ip() {
     # 1. 定义 API 列表，包含你要求的 Cloudflare 接口和原本的 JSON 接口
     # 优先使用 Cloudflare 接口，因为它们的响应最快且最稳定
     local api_endpoints=(
-        #"https://one.one.one.one/cdn-cgi/trace"
-        #"https://cloudflare.com/cdn-cgi/trace"
+        "https://one.one.one.one/cdn-cgi/trace"
+        "https://cloudflare.com/cdn-cgi/trace"
         "https://api-ipv4.ip.sb/geoip"
         "https://api.ipapi.is"
+        "https://myip.ipip.net/json"
+        "https://ifconfig.co/json"
+        "https://ipapi.co/json"
     )
 
     local response
