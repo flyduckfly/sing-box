@@ -97,10 +97,10 @@ load() {
     . $is_sh_dir/src/$1
 }
 
-# wget add --no-check-certificate
+# wget add --no-check-certificate with progress bar
 _wget() {
     [[ $proxy ]] && export https_proxy=$proxy
-    wget --no-check-certificate $*
+    wget --no-check-certificate --show-progress $*
 }
 
 # print a mesage
@@ -141,11 +141,11 @@ install_pkg() {
     if [[ $cmd_not_found ]]; then
         pkg=$(echo $cmd_not_found | sed 's/,/ /g')
         msg warn "安装依赖包 >${pkg}"
-        $cmd install -y $pkg &>/dev/null
+        $cmd install -y $pkg 2>&1 | tee -a /tmp/sb_install.log
         if [[ $? != 0 ]]; then
             [[ $cmd =~ yum ]] && yum install epel-release -y &>/dev/null
             $cmd update -y &>/dev/null
-            $cmd install -y $pkg &>/dev/null
+            $cmd install -y $pkg 2>&1 | tee -a /tmp/sb_install.log
             [[ $? == 0 ]] && >$is_pkg_ok
         else
             >$is_pkg_ok
@@ -155,7 +155,7 @@ install_pkg() {
     fi
 }
 
-# download file
+# download file with progress
 download() {
     case $1 in
     core)
@@ -181,16 +181,28 @@ download() {
 
     [[ $link ]] && {
         msg warn "下载 ${name} > ${link}"
+        echo "正在下载 ${name}..."
         if _wget -t 3 -q -c $link -O $tmpfile; then
             mv -f $tmpfile $is_ok
+            echo -e "${green}✓ ${name} 下载完成${none}"
+        else
+            echo -e "${red}✗ ${name} 下载失败${none}"
+            return 1
         fi
     }
 }
 
 # get server ip
 get_ip() {
-    export "$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
-    [[ -z $ip ]] && export "$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
+    # 只获取IPv4地址
+    local response=$(_wget -4 -qO- https://api-ipv4.ip.sb/geoip 2>/dev/null)
+    if [[ -n "$response" ]]; then
+        # 使用jq解析JSON响应获取IP
+        local extracted_ip=$(echo "$response" | jq -r '.ip' 2>/dev/null)
+        if [[ -n "$extracted_ip" && "$extracted_ip" != "null" ]]; then
+            export ip="$extracted_ip"
+        fi
+    fi
 }
 
 # check background tasks status
@@ -219,9 +231,18 @@ check_status() {
     else
         [[ ! $is_fail ]] && {
             is_wget=1
-            [[ ! $is_core_file ]] && download core &
-            [[ ! $local_install ]] && download sh &
-            [[ $jq_not_found ]] && download jq &
+            [[ ! $is_core_file ]] && {
+                echo -e "\n${yellow}开始下载 ${is_core_name}...${none}"
+                download core
+            }
+            [[ ! $local_install ]] && {
+                echo -e "\n${yellow}开始下载 ${is_core_name} 脚本...${none}"
+                download sh
+            }
+            [[ $jq_not_found ]] && {
+                echo -e "\n${yellow}开始下载 jq...${none}"
+                download jq
+            }
             get_ip
             wait
             check_status
@@ -295,6 +316,14 @@ exit_and_del_tmpdir() {
     exit
 }
 
+# remove sb alias and symlink
+remove_sb_alias() {
+    # Remove alias from .bashrc
+    sed -i '/alias sb=/d' /root/.bashrc 2>/dev/null
+    # Remove symlink
+    rm -f ${is_sh_bin/$is_core/sb} 2>/dev/null
+}
+
 # main
 main() {
 
@@ -316,6 +345,10 @@ main() {
     msg warn "开始安装..."
     [[ $is_core_ver ]] && msg warn "${is_core_name} 版本: ${yellow}$is_core_ver${none}"
     [[ $proxy ]] && msg warn "使用代理: ${yellow}$proxy${none}"
+    
+    # Remove sb alias and symlink during installation
+    remove_sb_alias
+    
     # create tmpdir
     mkdir -p $tmpdir
     # if is_core_file, copy file
@@ -334,8 +367,9 @@ main() {
         is_ntp_on=1
     }
 
-    # install dependent pkg
-    install_pkg $is_pkg &
+    # install dependent pkg with progress
+    echo -e "\n${yellow}安装依赖包...${none}"
+    install_pkg $is_pkg
 
     # jq
     if [[ $(type -P jq) ]]; then
@@ -343,16 +377,22 @@ main() {
     else
         jq_not_found=1
     fi
-    # if wget installed. download core, sh, jq, get ip
-    [[ $is_wget ]] && {
-        [[ ! $is_core_file ]] && download core &
-        [[ ! $local_install ]] && download sh &
-        [[ $jq_not_found ]] && download jq &
-        get_ip
+    
+    # Download files with progress display
+    [[ ! $is_core_file ]] && {
+        echo -e "\n${yellow}下载 ${is_core_name}...${none}"
+        download core
     }
-
-    # waiting for background tasks is done
-    wait
+    [[ ! $local_install ]] && {
+        echo -e "\n${yellow}下载 ${is_core_name} 脚本...${none}"
+        download sh
+    }
+    [[ $jq_not_found ]] && {
+        echo -e "\n${yellow}下载 jq...${none}"
+        download jq
+    }
+    
+    get_ip
 
     # check background tasks status
     check_status
@@ -360,7 +400,7 @@ main() {
     # test $is_core_file
     if [[ $is_core_file ]]; then
         mkdir -p $tmpdir/testzip
-        tar zxf $is_core_ok --strip-components 1 -C $tmpdir/testzip &>/dev/null
+        tar zxf $is_core_ok --strip-components 1 -C $tmpdir/testzip 2>&1 | tee -a /tmp/sb_install.log
         [[ $? != 0 ]] && {
             msg err "${is_core_name} 文件无法通过测试."
             exit_and_del_tmpdir
@@ -382,18 +422,20 @@ main() {
 
     # copy sh file or unzip sh zip file.
     if [[ $local_install ]]; then
-        cp -rf $PWD/* $is_sh_dir
+        cp -rf $PWD/* $is_sh_dir 2>&1 | tee -a /tmp/sb_install.log
     else
-        tar zxf $is_sh_ok -C $is_sh_dir
+        echo -e "\n${yellow}解压脚本文件...${none}"
+        tar zxf $is_sh_ok -C $is_sh_dir 2>&1 | tee -a /tmp/sb_install.log
     fi
 
     # create core bin dir
     mkdir -p $is_core_dir/bin
     # copy core file or unzip core zip file
     if [[ $is_core_file ]]; then
-        cp -rf $tmpdir/testzip/* $is_core_dir/bin
+        cp -rf $tmpdir/testzip/* $is_core_dir/bin 2>&1 | tee -a /tmp/sb_install.log
     else
-        tar zxf $is_core_ok --strip-components 1 -C $is_core_dir/bin
+        echo -e "\n${yellow}解压 ${is_core_name} 核心文件...${none}"
+        tar zxf $is_core_ok --strip-components 1 -C $is_core_dir/bin 2>&1 | tee -a /tmp/sb_install.log
     fi
 
     # add alias
@@ -419,7 +461,7 @@ main() {
     # create systemd service
     load systemd.sh
     is_new_install=1
-    install_service $is_core &>/dev/null
+    install_service $is_core 2>&1 | tee -a /tmp/sb_install.log
 
     # create condf dir
     mkdir -p $is_conf_dir
