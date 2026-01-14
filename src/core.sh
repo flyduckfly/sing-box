@@ -722,9 +722,8 @@ uninstall() {
     : > /root/.bash_history || true
     hash -r
     echo -e "\n${green}清理完成！${none}"
-    echo -e "${yellow}注意：${none}如果输入 'sb' 仍报错，请手动执行命令: ${cyan}unalias sb && hash -r${none}"
-    
-    msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
+    echo -e "${yellow}注意：${none}如果输入'sb'仍报错，请手动执行命令: ${cyan}reboot${none}"
+    echo
 }
 
 # manage run status
