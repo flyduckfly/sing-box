@@ -691,6 +691,8 @@ uninstall() {
     _green "\n卸载完成!"
     unalias sb 2>/dev/null
     unalias sing-box 2>/dev/null
+    hash -r
+    hash -r
     msg "脚本哪里需要完善? 请反馈"
     msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
 }
