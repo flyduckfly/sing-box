@@ -193,29 +193,44 @@ download() {
 
 # get server ip
 get_ip() {
-    # 只获取IPv4地址，尝试多个API
-    local api_endpoints=(
-        "https://api-ipv4.ip.sb/geoip"
-        "https://api.ipapi.is"
-    )
-    
-    for api in "${api_endpoints[@]}"; do
-        local response=$(_wget -4 -qO- "$api" 2>/dev/null)
-        if [[ -n "$response" ]]; then
-            # 尝试解析JSON响应获取IP
-            local extracted_ip=$(echo "$response" | jq -r '.ip // .query // .address // .ip_address' 2>/dev/null)
-            if [[ -n "$extracted_ip" && "$extracted_ip" != "null" ]]; then
-                export ip="$extracted_ip"
-                return 0
+        local api_endpoints=(
+            "https://api-ipv4.ip.sb/geoip"             # JSON
+            "https://api.ipapi.is"                    # JSON
+            "https://myip.ipip.net/json"              # JSON (IPIP.net)
+            "https://ifconfig.co/json"                # JSON
+            "https://ipapi.co/json"                   # JSON
+            "https://1.1.1.1/cdn-cgi/trace"           # Text (Cloudflare)
+            "https://domains.google.com/checkip"      # Text (Google)
+            "https://api.ipify.org"                   # Text
+        )
+        
+        for api in "${api_endpoints[@]}"; do
+            # 增加 --timeout 参数提高效率
+            local response=$(_wget -4 -T 5 -qO- "$api" 2>/dev/null)
+            
+            if [[ -n "$response" ]]; then
+                local extracted_ip=""
+        
+                # 判断是否为 JSON 格式（包含左大括号）
+                if [[ "$response" == *"{"* ]]; then
+                    # 尝试解析JSON响应
+                    extracted_ip=$(echo "$response" | jq -r '.ip // .query // .address // .ip_address' 2>/dev/null)
+                else
+                    # 针对 Cloudflare 这种 key=value 格式或纯文本格式进行提取
+                    # 使用正则匹配标准的 IPv4 地址
+                    extracted_ip=$(echo "$response" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+                fi
+        
+                # 最终验证提取到的 IP 是否有效且不为 null
+                if [[ -n "$extracted_ip" && "$extracted_ip" != "null" ]]; then
+                    export ip="$extracted_ip"
+                    return 0
+                fi
             fi
-        fi
-        # 短暂延迟，避免请求过快
-        sleep 0.5
-    done
-    
-    # 如果所有API都失败，返回空
-    export ip=""
-    return 1
+            
+            # 如果失败，短暂延迟，避免被防火墙误伤
+            sleep 0.5
+        done
 }
 
 # check background tasks status
