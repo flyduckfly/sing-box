@@ -689,9 +689,43 @@ uninstall() {
     fi
     [[ $is_install_sh ]] && return # reinstall
     _green "\n卸载完成!"
-    unalias sb 2>/dev/null
-    unalias sing-box 2>/dev/null
-    hash -r
+    
+    set -e
+    echo "==> [1/5] 清理当前 shell 中的 sb alias（如存在）"
+    unalias sb 2>/dev/null || true
+    
+    echo "==> [2/5] 从 /root/.bashrc 中删除 sb alias"
+    if grep -qE '^alias sb=' /root/.bashrc 2>/dev/null; then
+        sed -i.bak '/^alias sb=/d' /root/.bashrc
+        echo "    已删除 alias sb（原文件已备份为 /root/.bashrc.bak）"
+    else
+        echo "    未发现 alias sb"
+    fi
+    
+    echo "==> [3/5] 重新加载 bash 配置"
+    source /root/.bashrc || true
+    
+    echo "==> [4/5] 删除可能残留的 sing-box 文件/软链接"
+    rm -f /usr/local/bin/sing-box
+    rm -f /usr/bin/sing-box
+    rm -f /usr/local/bin/sb
+    
+    echo "==> [5/5] 可选：清理历史记录中的 sing-box 痕迹"
+    # 如不想清理历史，注释下面两行即可
+    history -c || true
+    : > /root/.bash_history || true
+    
+    echo
+    echo "=== 清理完成，开始最终验证 ==="
+    
+    echo "- sb:"
+    type sb 2>/dev/null || echo "  sb: not found"
+    
+    echo "- sing-box:"
+    command -v sing-box 2>/dev/null || echo "  sing-box: not found"
+    
+    echo
+    echo "系统已处于干净状态 ✅"
     hash -r
     msg "脚本哪里需要完善? 请反馈"
     msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
