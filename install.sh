@@ -193,13 +193,19 @@ download() {
 
 # get server ip
 get_ip() {
-    # 强制只获取 IPv4 地址，增加 5 秒超时限制，增加备用接口
-    # 尝试第一个接口 (one.one.one.one)
-    export "$(_wget -4 -qO- --timeout=5 --tries=1 https://one.one.one.one/cdn-cgi/trace 2>/dev/null | grep ip=)"
+    local tmp_ip
     
-    # 如果第一个接口失败，尝试第二个接口 (cloudflare.com)
-    if [[ -z $ip ]]; then
-        export "$(_wget -4 -qO- --timeout=5 --tries=1 https://cloudflare.com/cdn-cgi/trace 2>/dev/null | grep ip=)"
+    # 尝试第一个接口 (one.one.one.one)
+    tmp_ip=$(_wget -4 -qO- --timeout=5 --tries=1 https://one.one.one.one/cdn-cgi/trace 2>/dev/null | grep 'ip=')
+    
+    # 如果第一个失败，尝试第二个接口 (cloudflare.com)
+    if [[ -z $tmp_ip ]]; then
+        tmp_ip=$(_wget -4 -qO- --timeout=5 --tries=1 https://cloudflare.com/cdn-cgi/trace 2>/dev/null | grep 'ip=')
+    fi
+    
+    # 只有当 tmp_ip 不为空时才执行 export，彻底解决 "not a valid identifier" 报错
+    if [[ -n $tmp_ip ]]; then
+        export "$tmp_ip"
     fi
 }
 
