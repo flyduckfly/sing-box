@@ -727,35 +727,7 @@ uninstall() {
     [[ $is_install_sh ]] && return # reinstall
     _green "\n卸载完成!"
     
-    set -e
-    # 1. 增加对全局配置文件的清理，防止别名在其他地方复活
-    echo "==> [1/5] 清理当前 shell 内存及全局配置中的 sb alias"
-    unalias sb 2>/dev/null || true
-    unalias sing-box 2>/dev/null || true
-    
-    # 2. 增强 sed 匹配模式，防止因空格或引号导致删除失败
-    echo "==> [2/5] 从配置文件中彻底删除别名定义"
-    FILES_TO_CLEAN=("/root/.bashrc" "/etc/bash.bashrc" "/etc/profile")
-    for file in "${FILES_TO_CLEAN[@]}"; do
-        if [ -f "$file" ]; then
-            # 匹配 alias sb= 或 alias sing-box= 开头的行
-            sed -i.bak -E '/alias (sb|sing-box)=/d' "$file"
-        fi
-    done
-
-    echo "==> [3/5] 刷新系统命令哈希表"
-    # hash -r 必须在删除文件后立即执行，确保 PATH 重新扫描
-    hash -r
-    
-    echo "==> [4/5] 物理删除二进制文件及所有可能的软链接"
-    # 增加对 /usr/bin/sb 的覆盖
-    rm -f /usr/local/bin/sing-box /usr/bin/sing-box
-    rm -f /usr/local/bin/sb /usr/bin/sb
-    
-    echo "==> [5/5] 清理历史记录并提示生效"
-    history -c || true
-    # 清空历史文件
-    : > /root/.bash_history || true
+    sed -i '/sing-box/d' /root/.bashrc
     hash -r
     echo -e "\n${green}清理完成！${none}"
     echo -e "${yellow}注意：${none}如果输入'sb'仍报错，请手动执行命令: ${cyan}reboot${none}"
